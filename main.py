@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from src.ai_python.presentation.routes import health, generate
+from ai_python.presentation.routes import generate, health
 
 app = FastAPI()
 

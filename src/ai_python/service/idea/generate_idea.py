@@ -1,15 +1,16 @@
-from ai_python.presentation.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse
-
+from ai_python.infrastructure.llm.base import AIClient
+from ai_python.presentation.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse, Idea
 
 class GenerateIdea:
 
-    def __init__(self, llm):
-        self.llm = llm
+    def __init__(self, ai_client: AIClient):
+        self.ai_client = ai_client
 
     async def execute(
         self,
         request: GenerateIdeaRequest,
     ) -> GenerateIdeaResponse:
+
         prompt = f"""
         Generate content ideas for:
 
@@ -20,8 +21,12 @@ class GenerateIdea:
         Content pillar: {request.content_pillar}
         """
 
-        ideas = await self.llm.generate(prompt)
+        result = await self.ai_client.generate(prompt)
 
         return GenerateIdeaResponse(
-            ideas=ideas
+            ideas=[Idea(
+                title="Test title",
+                description=result,
+                hook="Test hook",
+            )]
         )
