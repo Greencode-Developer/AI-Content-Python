@@ -1,13 +1,16 @@
 from ai_python.presentation.schemas.generate_idea import GenerateIdeaResponse
+from google import genai
 
 
 class GeminiAIClient:
 
+    def __init__(self):
+        self.client = genai.Client()
+
     async def generate(self, prompt: str) -> str:
-        return """
-        {
-            "title": "Khuyến mãi cà phê cuối tuần",
-            "description": "Giới thiệu chương trình ưu đãi cà phê cuối tuần.",
-            "hook": "Cuối tuần này, bạn đã có lý do để ghé quán chưa?"
-        }
-        """
+        response = await self.client.aio.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
+
+        return response.text
