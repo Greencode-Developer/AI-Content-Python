@@ -3,11 +3,13 @@ name = "ai-python"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-authors = [
-    { name = "camdao", email = "luongcamdao@gmail.com" }
-]
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "fastapi>=0.142.2",
+    "google-genai>=2.28.0",
+    "python-dotenv>=1.2.4",
+    "uvicorn>=0.54.0",
+]
 
 [project.scripts]
 ai-python = "ai_python:main"

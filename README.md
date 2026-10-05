@@ -1,1 +1,1 @@
-uv run fastapi dev
+uv run uvicorn main:app --reload
