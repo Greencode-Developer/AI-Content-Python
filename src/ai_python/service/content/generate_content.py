@@ -19,14 +19,16 @@ from ai_python.presentation.schemas.generate_content import (
     GeneratedContent,
 )
 
-# Model name được lấy từ GeminiAIClient — đồng bộ để ghi vào ai_model_used
-_DEFAULT_MODEL_NAME = "gemini-3.8-flash"
+_UNKNOWN_MODEL = "unknown"
 
 
 class GenerateContent:
 
     def __init__(self, ai_client: AIClient):
         self.ai_client = ai_client
+        # Mỗi provider (GeminiAIClient, BedrockAIClient) khai báo MODEL_NAME trên class.
+        # Dùng getattr với fallback để tương thích với bất kỳ AIClient nào trong tương lai.
+        self._model_name: str = getattr(type(ai_client), "MODEL_NAME", _UNKNOWN_MODEL)
 
     # ── Public ──────────────────────────────────────────────────────────────
 
@@ -40,7 +42,7 @@ class GenerateContent:
 
         return GenerateContentResponse(
             content=content,
-            ai_model_used=_DEFAULT_MODEL_NAME,
+            ai_model_used=self._model_name,
             idea_id=request.idea_id,
             pillar_id=request.pillar_id,
             persona_id=request.persona_id,
