@@ -1,7 +1,8 @@
-from ai_python.infrastructure.llm.base import AIClient
-from ai_python.infrastructure.llm.enums import AIProvider
-from ai_python.infrastructure.llm.providers.bedrock import BedrockAIClient
-from ai_python.infrastructure.llm.providers.gemini import GeminiAIClient
+
+from ai_python.llm.providers.base import AIClient
+from ai_python.llm.enum.enums import AIProvider
+from ai_python.llm.providers.bedrock import BedrockAIClient
+from ai_python.llm.providers.gemini import GeminiAIClient
 
 
 class LLMFactory:

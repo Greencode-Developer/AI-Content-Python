@@ -1,5 +1,7 @@
-from ai_python.infrastructure.llm.base import AIClient
-from ai_python.presentation.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse, Idea
+
+from ai_python.llm.providers.base import AIClient
+from ai_python.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse, Idea
+
 
 class GenerateIdea:
 

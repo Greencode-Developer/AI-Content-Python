@@ -1,18 +1,10 @@
 from fastapi import APIRouter, Depends
 
-from ai_python.presentation.dependencies.services import (
-    get_generate_content_service,
-    get_generate_idea_service,
-)
-from ai_python.presentation.schemas.generate_content import (
-    GenerateContentRequest,
-    GenerateContentResponse,
-)
-from ai_python.presentation.schemas.generate_idea import (
-    GenerateIdeaRequest,
-    GenerateIdeaResponse,
-)
+
+from ai_python.schemas.generate_content import GenerateContentRequest, GenerateContentResponse
+from ai_python.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse
 from ai_python.service.content.generate_content import GenerateContent
+from ai_python.service.dependencies.services import get_generate_content_service, get_generate_idea_service
 from ai_python.service.idea.generate_idea import GenerateIdea
 
 router = APIRouter()
