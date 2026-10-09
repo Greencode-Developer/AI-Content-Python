@@ -12,12 +12,9 @@ Luồng:
 import json
 import re
 
-from ai_python.infrastructure.llm.base import AIClient
-from ai_python.presentation.schemas.generate_content import (
-    GenerateContentRequest,
-    GenerateContentResponse,
-    GeneratedContent,
-)
+from ai_python.llm.providers.base import AIClient
+from ai_python.schemas.generate_content import GenerateContentRequest, GenerateContentResponse, GeneratedContent
+
 
 _UNKNOWN_MODEL = "unknown"
 
