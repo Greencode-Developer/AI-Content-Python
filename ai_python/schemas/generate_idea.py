@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel,Field
 
 
 class GenerateIdeaRequest(BaseModel):
@@ -10,9 +10,11 @@ class GenerateIdeaRequest(BaseModel):
 
 
 class Idea(BaseModel):
-    title: str
-    description: str
-    hook: str
+    title: str = Field(min_length=1)
+    approach_angle: str = Field(min_length=1)
+    hook_sentence: str = Field(min_length=1)
+    reason: str = Field(min_length=1)
+
 
 
 class GenerateIdeaResponse(BaseModel):
