@@ -1,7 +1,10 @@
-
+import json
 from ai_python.llm.providers.base import AIClient
 from ai_python.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse, Idea
 
+
+from ai_python.llm.providers.base import AIClient
+from ai_python.prompts.idea import build_generate_idea_prompt
 
 class GenerateIdea:
 
@@ -12,23 +15,14 @@ class GenerateIdea:
         self,
         request: GenerateIdeaRequest,
     ) -> GenerateIdeaResponse:
-
-        prompt = f"""
-        Generate content ideas for:
-
-        Topic: {request.topic}
-        Brand: {request.brand_name}
-        Tone: {request.tone}
-        Persona: {request.persona}
-        Content pillar: {request.content_pillar}
-        """
+        prompt = build_generate_idea_prompt(request)
 
         result = await self.ai_client.generate(prompt)
+        data = json.loads(result)
 
         return GenerateIdeaResponse(
-            ideas=[Idea(
-                title="Test title",
-                description=result,
-                hook="Test hook",
-            )]
+            ideas=[
+                Idea(**idea)
+                for idea in data["ideas"]
+            ]
         )
