@@ -1,6 +1,5 @@
 from google import genai
 from google.genai.errors import ServerError
-
 from fastapi import HTTPException
 
 _GEMINI_MODEL = "gemini-3.8-flash"

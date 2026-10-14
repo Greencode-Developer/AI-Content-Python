@@ -1,10 +1,23 @@
 from dotenv import load_dotenv
-from fastapi import FastAPI
-
-from ai_python.api import health
-from ai_python.api import generate
 
 load_dotenv()
+
+from fastapi import FastAPI
+from langfuse import get_client
+from openinference.instrumentation.google_genai import (
+    GoogleGenAIInstrumentor,
+)
+
+from ai_python.api import health, generate
+
+
+# Langfuse
+langfuse = get_client()
+assert langfuse.auth_check(), "Langfuse authentication failed"
+
+#Google GenAI SDK
+GoogleGenAIInstrumentor().instrument()
+
 
 app = FastAPI(
     title="AI Content Platform",
