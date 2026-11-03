@@ -1,5 +1,5 @@
 [project]
-name = "ai-python"
+name = "app"
 version = "0.1.0"
 description = "AI Content Python Service"
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ai-python = "ai_python:main"
+app = "app:main"
 
 [build-system]
 requires = ["uv_build>=0.12.21,<0.13.0"]

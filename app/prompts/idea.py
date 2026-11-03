@@ -1,5 +1,5 @@
 from langfuse import get_client
-from ai_python.schemas.generate_idea import GenerateIdeaRequest
+from app.schemas.generate_idea import GenerateIdeaRequest
 
 langfuse = get_client()
 

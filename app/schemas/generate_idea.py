@@ -16,6 +16,5 @@ class Idea(BaseModel):
     reason: str = Field(min_length=1)
 
 
-
 class GenerateIdeaResponse(BaseModel):
     ideas: list[Idea]

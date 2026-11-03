@@ -8,7 +8,7 @@ from openinference.instrumentation.google_genai import (
     GoogleGenAIInstrumentor,
 )
 
-from ai_python.api import health, generate
+from app.api import content, health, ideas
 
 
 # Langfuse
@@ -30,7 +30,7 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-API_PREFIX = "/api/v1"
 
-app.include_router(health.router, prefix=API_PREFIX)
-app.include_router(generate.router, prefix=API_PREFIX)
+app.include_router(health.router)
+app.include_router(content.router)
+app.include_router(ideas.router)

@@ -1,0 +1,2 @@
+class InvalidLLMOutputError(Exception):
+    pass
