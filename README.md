@@ -1,2 +1,13 @@
-uv run uvicorn ai_python.main:app --reload
-uv run fastapi dev ai_python/main.py
+# AI Content Python Service
+
+```bash
+uv sync
+cp .env.example .env   # then fill in the keys
+uv run fastapi dev app/main.py
+```
+
+Tests:
+
+```bash
+uv run pytest
+```

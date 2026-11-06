@@ -1,7 +1,8 @@
 import json
 
 from pydantic import ValidationError
-from app.exception.exception import InvalidLLMOutputError
+from app.core.exception.exception import InvalidLLMOutputError
+from app.core.llm_output import extract_json
 from app.infrastructure.llm.providers.base import AIClient
 from app.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse
 from app.prompts.idea import build_generate_idea_prompt
@@ -19,7 +20,8 @@ async def generate_idea_service(
         result = await ai_client.generate(prompt)
 
         try:
-            data = json.loads(result)
+            # Models often wrap the JSON in a ```json fence
+            data = json.loads(extract_json(result) or result)
             return GenerateIdeaResponse.model_validate(data)
 
         except (json.JSONDecodeError, ValidationError) as exc:
