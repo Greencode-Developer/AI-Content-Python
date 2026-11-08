@@ -9,3 +9,4 @@ htmlcov
 .env
 .idea
 .pytest_cache
+evaluation/results
