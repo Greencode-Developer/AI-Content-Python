@@ -41,7 +41,19 @@ _BOTO_CONFIG = Config(
 class BedrockAIClient:
     """AIClient implementation dùng AWS Bedrock Converse API."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        model_id: str = _MODEL_ID,
+        temperature: float = 0.7,
+        # Claude 4.5+ rejects a request that sets both temperature and topP: pass None for Claude
+        top_p: float | None = 0.9,
+        max_tokens: int = 2048,
+    ) -> None:
+        self._model_id = model_id
+        self._inference_config = {"maxTokens": max_tokens, "temperature": temperature}
+        if top_p is not None:
+            self._inference_config["topP"] = top_p
+
         region = os.getenv("AWS_BEDROCK_REGION", "us-east-1")
         self._client = boto3.client(
             "bedrock-runtime",
@@ -64,18 +76,14 @@ class BedrockAIClient:
     def _invoke(self, prompt: str) -> str:
         """Gọi Converse API (sync) — chạy trong thread pool."""
         response = self._client.converse(
-            modelId=_MODEL_ID,
+            modelId=self._model_id,
             messages=[
                 {
                     "role": "user",
                     "content": [{"text": prompt}],
                 }
             ],
-            inferenceConfig={
-                "maxTokens": 2048,
-                "temperature": 0.7,
-                "topP": 0.9,
-            },
+            inferenceConfig=self._inference_config,
         )
 
         # Converse API trả về: output.message.content[0].text

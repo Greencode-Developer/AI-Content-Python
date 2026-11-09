@@ -69,6 +69,17 @@ def score(results: list[RuleResult]) -> float:
     return sum(result.passed for result in results) / len(results) if results else 0.0
 
 
+def parse_response(raw_output: str) -> GenerateIdeaResponse | None:
+    """The ideas the service would return, or None when the output breaks the schema."""
+    data, _ = _parse(raw_output)
+    if data is None:
+        return None
+    try:
+        return GenerateIdeaResponse.model_validate(data)
+    except ValidationError:
+        return None
+
+
 def _parse(raw_output: str) -> tuple[dict | None, str]:
     try:
         data = json.loads(extract_json(raw_output) or raw_output)
