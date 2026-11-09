@@ -29,3 +29,7 @@ dev = [
     "httpx>=0.28.1",
     "pytest>=9.2.0",
 ]
+
+[tool.pytest.ini_options]
+# Lets the tests import the evaluation package, which is not part of the app build
+pythonpath = ["."]
