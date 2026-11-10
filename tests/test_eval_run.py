@@ -21,7 +21,7 @@ class FakeAIClient:
         self.responses = list(responses)
         self.calls = 0
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -80,6 +80,7 @@ def test_results_are_saved_as_json(tmp_path):
     assert report["provider"] == "bedrock"
     assert report["model"] == "amazon-nova-micro-v1"
     assert report["judge_model"] is None
+    assert report["prompt_version"] is None
     assert report["cases"][0]["rules"][0] == {"name": "valid_json", "passed": True, "detail": ""}
 
 
@@ -141,3 +142,14 @@ def test_saved_outputs_are_rescored_without_generating(tmp_path):
     path = save_results(results, "bedrock", "amazon-nova-micro-v1", "haiku-4.5", first.name, output_dir=tmp_path)
     assert path.name.endswith("-bedrock-judge-haiku-4.5.json")
     assert json.loads(path.read_text(encoding="utf-8"))["source"] == first.name
+
+
+def test_prompt_version_is_saved_in_the_name_and_the_report(tmp_path):
+    path = save_results(
+        run(FakeAIClient(GOOD), 1), "bedrock", "amazon-nova-micro-v1",
+        prompt_label="candidate", prompt_version=2, output_dir=tmp_path,
+    )
+
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert path.name.endswith("-bedrock-prompt-v2.json")
+    assert (report["prompt_label"], report["prompt_version"]) == ("candidate", 2)

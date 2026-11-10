@@ -1,4 +1,5 @@
 from google import genai
+from google.genai import types
 from google.genai.errors import ServerError
 from fastapi import HTTPException
 
@@ -13,11 +14,18 @@ class GeminiAIClient:
     def __init__(self):
         self.client = genai.Client()
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
+        config = None
+        if json_schema is not None:
+            config = types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=json_schema,
+            )
         try:
             response = await self.client.aio.models.generate_content(
                 model=_GEMINI_MODEL,
                 contents=prompt,
+                config=config,
             )
             return response.text
         except ServerError as e:

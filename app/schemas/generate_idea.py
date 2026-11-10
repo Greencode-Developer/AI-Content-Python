@@ -24,3 +24,19 @@ class Idea(BaseModel):
 class GenerateIdeaResponse(BaseModel):
     # The prompt asks for exactly IDEA_COUNT ideas, so any other count is retried
     ideas: list[Idea] = Field(min_length=IDEA_COUNT, max_length=IDEA_COUNT)
+
+
+# Passed to the provider so the answer is always valid JSON. Idea is inlined:
+# a $ref to $defs (what Pydantic generates for the full response) is not supported by every provider
+IDEA_JSON_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "ideas": {
+            "type": "array",
+            "minItems": IDEA_COUNT,
+            "maxItems": IDEA_COUNT,
+            "items": Idea.model_json_schema(),
+        },
+    },
+    "required": ["ideas"],
+}

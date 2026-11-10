@@ -2,6 +2,7 @@
 
     uv run python -m evaluation.run --provider bedrock --limit 5
     uv run python -m evaluation.run --provider bedrock --judge
+    uv run python -m evaluation.run --prompt-label candidate --judge
     uv run python -m evaluation.run --from-results evaluation/results/<file>.json --judge
 """
 
@@ -12,6 +13,7 @@ from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
+from functools import partial
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -21,8 +23,8 @@ load_dotenv()
 from app.infrastructure.llm.llm import AIProvider, get_ai_client
 from app.infrastructure.llm.providers import bedrock, gemini
 from app.infrastructure.llm.providers.base import AIClient
-from app.prompts.idea import build_generate_idea_prompt
-from app.schemas.generate_idea import GenerateIdeaRequest
+from app.prompts.idea import build_generate_idea_prompt, compile_generate_idea_prompt, get_generate_idea_prompt
+from app.schemas.generate_idea import IDEA_JSON_SCHEMA, GenerateIdeaRequest
 from evaluation.dataset import DEFAULT_DATASET, EvalCase, load_dataset
 from evaluation.judge import DEFAULT_JUDGE, JUDGE_MODELS, SCORED_CRITERIA, JudgeVerdict, create_judge_client, judge
 from evaluation.rules import RuleResult, evaluate, parse_response, score
@@ -66,8 +68,9 @@ async def run_experiment(
             result.raw_output, result.error = replay[case.id].raw_output, replay[case.id].error
         else:
             try:
-                # One call, no retry: the service's retry would hide first-try failures
-                result.raw_output = await ai_client.generate(build_prompt(case.input))
+                # One call, no retry: the service's retry would hide first-try failures.
+                # Same JSON schema as the service, so the eval tests what production sends
+                result.raw_output = await ai_client.generate(build_prompt(case.input), json_schema=IDEA_JSON_SCHEMA)
             except Exception as exc:
                 result.error = f"{type(exc).__name__}: {exc}"
 
@@ -172,16 +175,22 @@ def save_results(
     model: str,
     judge_model: str | None = None,
     source: str | None = None,
+    prompt_label: str | None = None,
+    prompt_version: int | None = None,
     output_dir: Path = RESULTS_DIR,
 ) -> Path:
     output_dir.mkdir(parents=True, exist_ok=True)
     created_at = datetime.now()
-    suffix = f"-judge-{judge_model}" if judge_model else ""
-    path = output_dir / f"{created_at:%Y%m%d-%H%M%S}-{provider}{suffix}.json"
+    prompt_part = f"-prompt-v{prompt_version}" if prompt_version else ""
+    judge_part = f"-judge-{judge_model}" if judge_model else ""
+    path = output_dir / f"{created_at:%Y%m%d-%H%M%S}-{provider}{prompt_part}{judge_part}.json"
 
     report = {
         "provider": provider,
         "model": model,
+        # Which Langfuse prompt version produced the outputs, so runs of two versions can be compared
+        "prompt_label": prompt_label,
+        "prompt_version": prompt_version,
         "judge_model": judge_model,
         # The saved run whose outputs were re-scored, when --from-results is used
         "source": source,
@@ -215,6 +224,7 @@ def main() -> None:
     parser.add_argument("--judge", action="store_true", help="also score each output with the LLM judge")
     parser.add_argument("--judge-model", choices=list(JUDGE_MODELS), default=DEFAULT_JUDGE)
     parser.add_argument("--from-results", type=Path, help="re-score the outputs of a saved run instead of generating")
+    parser.add_argument("--prompt-label", default="production", help="Langfuse label of the prompt version to test")
     args = parser.parse_args()
 
     cases = load_dataset(args.dataset)
@@ -223,9 +233,16 @@ def main() -> None:
         source, replay = load_results(args.from_results)
         cases = [case for case in cases if case.id in replay]
         provider, model, ai_client = source["provider"], source["model"], None
+        # Runs saved before prompt versions were recorded have no such fields
+        prompt_label, prompt_version = source.get("prompt_label"), source.get("prompt_version")
+        build_prompt = build_generate_idea_prompt
     else:
         provider_enum = AIProvider(args.provider)
         provider, model, ai_client = provider_enum.value, MODEL_NAMES[provider_enum], get_ai_client(provider_enum)
+        # Fetched once: every case uses the same version
+        prompt = get_generate_idea_prompt(args.prompt_label)
+        prompt_label, prompt_version = args.prompt_label, prompt.version
+        build_prompt = partial(compile_generate_idea_prompt, prompt)
 
     if args.category:
         cases = [case for case in cases if case.category == args.category]
@@ -236,13 +253,17 @@ def main() -> None:
     judge_client = create_judge_client(judge_model) if judge_model else None
 
     action = f"Re-scoring {args.from_results.name}" if args.from_results else "Running"
-    print(f"{action}: {len(cases)} cases with {provider} ({model}), judge: {judge_model or 'off'}")
-    results = asyncio.run(run_experiment(cases, ai_client, judge_client=judge_client, replay=replay))
+    prompt_name = f"{prompt_label} v{prompt_version}" if prompt_version else "unknown"
+    print(f"{action}: {len(cases)} cases with {provider} ({model}), prompt: {prompt_name}, judge: {judge_model or 'off'}")
+    results = asyncio.run(
+        run_experiment(cases, ai_client, build_prompt=build_prompt, judge_client=judge_client, replay=replay)
+    )
 
     print()
     print(summarize(results))
     source_name = args.from_results.name if args.from_results else None
-    print(f"\nSaved to {save_results(results, provider, model, judge_model, source_name)}")
+    path = save_results(results, provider, model, judge_model, source_name, prompt_label, prompt_version)
+    print(f"\nSaved to {path}")
 
 
 if __name__ == "__main__":

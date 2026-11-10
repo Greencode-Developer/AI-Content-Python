@@ -4,7 +4,7 @@ from pydantic import ValidationError
 from app.core.exception.exception import InvalidLLMOutputError
 from app.core.llm_output import extract_json
 from app.infrastructure.llm.providers.base import AIClient
-from app.schemas.generate_idea import GenerateIdeaRequest, GenerateIdeaResponse
+from app.schemas.generate_idea import IDEA_JSON_SCHEMA, GenerateIdeaRequest, GenerateIdeaResponse
 from app.prompts.idea import build_generate_idea_prompt
 
 
@@ -17,7 +17,7 @@ async def generate_idea_service(
     prompt = build_generate_idea_prompt(request)
 
     for attempt in range(MAX_RETRIES + 1):
-        result = await ai_client.generate(prompt)
+        result = await ai_client.generate(prompt, json_schema=IDEA_JSON_SCHEMA)
 
         try:
             # Models often wrap the JSON in a ```json fence

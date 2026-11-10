@@ -33,6 +33,10 @@ uv run python -m evaluation.run --from-results evaluation/results/<file>.json --
 
 `--from-results` re-scores the outputs of a saved run, so judges can be compared on the same output.
 
+To test a new prompt version before it goes to production, give it a Langfuse label such as
+`candidate` and run `uv run python -m evaluation.run --prompt-label candidate --judge`.
+The label and version are saved with the results.
+
 Before trusting a judge, fill the `human` labels in `evaluation/datasets/judge_calibration.json`
 and compare:
 
