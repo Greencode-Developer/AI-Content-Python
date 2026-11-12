@@ -17,6 +17,7 @@ boto3 chỉ hỗ trợ sync I/O — ta wrap bằng asyncio.to_thread để khôn
 """
 
 import asyncio
+import json
 import logging
 import os
 
@@ -32,6 +33,9 @@ _MODEL_ID = "amazon.nova-micro-v1:0"
 # Tên model hiển thị để ghi vào trường ai_model_used
 MODEL_NAME = "amazon-nova-micro-v1"
 
+# Tool the model must call when the caller asks for JSON (see _invoke)
+_JSON_TOOL = "return_json"
+
 # Retry tự động khi gặp throttling (Bedrock on-demand có rate limit thấp hơn Provisioned)
 _BOTO_CONFIG = Config(
     retries={"max_attempts": 3, "mode": "adaptive"},
@@ -41,7 +45,19 @@ _BOTO_CONFIG = Config(
 class BedrockAIClient:
     """AIClient implementation dùng AWS Bedrock Converse API."""
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        model_id: str = _MODEL_ID,
+        temperature: float = 0.7,
+        # Claude 4.5+ rejects a request that sets both temperature and topP: pass None for Claude
+        top_p: float | None = 0.9,
+        max_tokens: int = 2048,
+    ) -> None:
+        self._model_id = model_id
+        self._inference_config = {"maxTokens": max_tokens, "temperature": temperature}
+        if top_p is not None:
+            self._inference_config["topP"] = top_p
+
         region = os.getenv("AWS_BEDROCK_REGION", "us-east-1")
         self._client = boto3.client(
             "bedrock-runtime",
@@ -51,32 +67,47 @@ class BedrockAIClient:
 
     # ── Public ───────────────────────────────────────────────────────────────
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
         """
         Gọi Bedrock Converse API bất đồng bộ.
         boto3 là sync — dùng asyncio.to_thread để chạy trên thread pool
         mà không block event loop của FastAPI.
         """
-        return await asyncio.to_thread(self._invoke, prompt)
+        return await asyncio.to_thread(self._invoke, prompt, json_schema)
 
     # ── Private ──────────────────────────────────────────────────────────────
 
-    def _invoke(self, prompt: str) -> str:
+    def _invoke(self, prompt: str, json_schema: dict | None) -> str:
         """Gọi Converse API (sync) — chạy trong thread pool."""
-        response = self._client.converse(
-            modelId=_MODEL_ID,
-            messages=[
+        request = {
+            "modelId": self._model_id,
+            "messages": [
                 {
                     "role": "user",
                     "content": [{"text": prompt}],
                 }
             ],
-            inferenceConfig={
-                "maxTokens": 2048,
-                "temperature": 0.7,
-                "topP": 0.9,
-            },
-        )
+            "inferenceConfig": self._inference_config,
+        }
+        if json_schema is not None:
+            # Forcing a tool call makes Bedrock return the tool input as parsed JSON:
+            # written as plain text, Nova Micro sometimes drops the commas between fields
+            request["toolConfig"] = {
+                "tools": [{"toolSpec": {
+                    "name": _JSON_TOOL,
+                    "description": "Return the answer",
+                    "inputSchema": {"json": json_schema},
+                }}],
+                "toolChoice": {"tool": {"name": _JSON_TOOL}},
+            }
+
+        response = self._client.converse(**request)
+        content = response["output"]["message"]["content"]
+
+        if json_schema is not None:
+            tool_input = next((block["toolUse"]["input"] for block in content if "toolUse" in block), None)
+            # No tool call (e.g. the answer hit maxTokens): "" fails JSON parsing, so the caller retries
+            return json.dumps(tool_input, ensure_ascii=False) if tool_input is not None else ""
 
         # Converse API trả về: output.message.content[0].text
-        return response["output"]["message"]["content"][0]["text"]
+        return content[0]["text"]

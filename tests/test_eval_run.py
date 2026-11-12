@@ -3,8 +3,7 @@ import json
 
 from app.schemas.generate_idea import GenerateIdeaRequest
 from evaluation.dataset import EvalCase
-from app.infrastructure.llm.llm import AIProvider
-from evaluation.run import run_experiment, save_results, summarize
+from evaluation.run import CaseResult, load_results, run_experiment, save_results, summarize
 
 REQUEST = GenerateIdeaRequest(topic="Tết", brand_name="Shop A", tone="vui", persona="", content_pillar="")
 
@@ -22,7 +21,7 @@ class FakeAIClient:
         self.responses = list(responses)
         self.calls = 0
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
         self.calls += 1
         response = self.responses.pop(0)
         if isinstance(response, Exception):
@@ -74,9 +73,83 @@ def test_summary_lists_failed_rules():
 
 
 def test_results_are_saved_as_json(tmp_path):
-    path = save_results(run(FakeAIClient(GOOD), 1), AIProvider.BEDROCK, output_dir=tmp_path)
+    path = save_results(run(FakeAIClient(GOOD), 1), "bedrock", "amazon-nova-micro-v1", output_dir=tmp_path)
 
     report = json.loads(path.read_text(encoding="utf-8"))
+    assert path.name.endswith("-bedrock.json")
     assert report["provider"] == "bedrock"
     assert report["model"] == "amazon-nova-micro-v1"
+    assert report["judge_model"] is None
+    assert report["prompt_version"] is None
     assert report["cases"][0]["rules"][0] == {"name": "valid_json", "passed": True, "detail": ""}
+
+
+VERDICT = json.dumps(
+    {
+        "invented_facts": ["tiệc độc quyền"],
+        "safety_issues": [],
+        **{
+            name: {"issues": [], "score": score, "reason": "ổn"}
+            for name, score in [("naturalness", 2), ("relevance", 4), ("specificity", 3), ("persona_fit", 3)]
+        },
+    },
+    ensure_ascii=False,
+)
+
+
+def run_with_judge(outputs: list[str], judge_client: FakeAIClient, replay: dict[str, CaseResult] | None = None):
+    generator = None if replay is not None else FakeAIClient(*outputs)
+    return asyncio.run(
+        run_experiment(
+            cases(len(outputs)), generator, build_prompt=lambda request: "PROMPT", judge_client=judge_client, replay=replay
+        )
+    )
+
+
+def test_judge_scores_only_outputs_that_pass_the_schema():
+    judge_client = FakeAIClient(VERDICT)
+
+    results = run_with_judge([GOOD, "not json"], judge_client)
+
+    assert judge_client.calls == 1
+    assert results[0].judge["naturalness"]["score"] == 2
+    assert results[1].judge is None
+
+
+def test_judge_error_is_recorded_and_rules_are_kept():
+    results = run_with_judge([GOOD], FakeAIClient(RuntimeError("throttled")))
+
+    assert results[0].judge_error == "RuntimeError: throttled"
+    assert results[0].score == 1.0
+
+
+def test_summary_shows_judge_scores_and_invented_facts():
+    summary = summarize(run_with_judge([GOOD], FakeAIClient(VERDICT)))
+
+    assert "Judge: 1 judged, 0 judge errors" in summary
+    assert "naturalness            2.0/5" in summary
+    assert "case-0: tiệc độc quyền" in summary
+
+
+def test_saved_outputs_are_rescored_without_generating(tmp_path):
+    first = save_results(run(FakeAIClient(GOOD, "not json"), 2), "bedrock", "amazon-nova-micro-v1", output_dir=tmp_path)
+    _, replay = load_results(first)
+
+    results = run_with_judge([GOOD, GOOD], FakeAIClient(VERDICT), replay=replay)
+
+    assert [result.score for result in results] == [1.0, 0.0]
+    assert results[0].judge is not None
+    path = save_results(results, "bedrock", "amazon-nova-micro-v1", "haiku-4.5", first.name, output_dir=tmp_path)
+    assert path.name.endswith("-bedrock-judge-haiku-4.5.json")
+    assert json.loads(path.read_text(encoding="utf-8"))["source"] == first.name
+
+
+def test_prompt_version_is_saved_in_the_name_and_the_report(tmp_path):
+    path = save_results(
+        run(FakeAIClient(GOOD), 1), "bedrock", "amazon-nova-micro-v1",
+        prompt_label="candidate", prompt_version=2, output_dir=tmp_path,
+    )
+
+    report = json.loads(path.read_text(encoding="utf-8"))
+    assert path.name.endswith("-bedrock-prompt-v2.json")
+    assert (report["prompt_label"], report["prompt_version"]) == ("candidate", 2)

@@ -4,7 +4,7 @@ import json
 import pytest
 
 from app.core.exception.exception import InvalidLLMOutputError
-from app.schemas.generate_idea import GenerateIdeaRequest
+from app.schemas.generate_idea import IDEA_JSON_SCHEMA, GenerateIdeaRequest
 from app.service.idea import generate_idea as service
 
 REQUEST = GenerateIdeaRequest(
@@ -24,9 +24,11 @@ class FakeAIClient:
     def __init__(self, *responses: str) -> None:
         self.responses = list(responses)
         self.prompts: list[str] = []
+        self.schemas: list[dict | None] = []
 
-    async def generate(self, prompt: str) -> str:
+    async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
         self.prompts.append(prompt)
+        self.schemas.append(json_schema)
         return self.responses.pop(0)
 
 
@@ -81,3 +83,11 @@ def test_raises_after_last_retry():
         generate(client)
 
     assert len(client.prompts) == service.MAX_RETRIES + 1
+
+
+def test_asks_the_provider_for_json_with_the_idea_schema():
+    client = FakeAIClient(ideas_json())
+
+    generate(client)
+
+    assert client.schemas == [IDEA_JSON_SCHEMA]
