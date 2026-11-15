@@ -21,6 +21,8 @@ def ideas_json(count: int = 3, title: str = "Ý tưởng") -> str:
 
 
 class FakeAIClient:
+    model = "amazon.nova-micro-v1:0"
+
     def __init__(self, *responses: str) -> None:
         self.responses = list(responses)
         self.prompts: list[str] = []
@@ -32,10 +34,18 @@ class FakeAIClient:
         return self.responses.pop(0)
 
 
+class FakePrompt:
+    name = "generate-ideas"
+    version = 3
+
+    def compile(self, **variables) -> str:
+        return "PROMPT"
+
+
 @pytest.fixture(autouse=True)
 def static_prompt(monkeypatch):
     # Keep the tests offline: the real prompt comes from Langfuse
-    monkeypatch.setattr(service, "build_generate_idea_prompt", lambda request: "PROMPT")
+    monkeypatch.setattr(service, "get_generate_idea_prompt", lambda: FakePrompt())
 
 
 def generate(client: FakeAIClient):
@@ -91,3 +101,22 @@ def test_asks_the_provider_for_json_with_the_idea_schema():
     generate(client)
 
     assert client.schemas == [IDEA_JSON_SCHEMA]
+
+
+def test_returns_the_trace_model_and_prompt_version_the_java_worker_saves(monkeypatch):
+    monkeypatch.setattr(service.langfuse, "get_current_trace_id", lambda: "trace-1")
+
+    response = generate(FakeAIClient(ideas_json()))
+
+    assert response.trace_id == "trace-1"
+    assert response.model == "amazon.nova-micro-v1:0"
+    # A string: the backend column ai_jobs.prompt_version is a VARCHAR
+    assert response.prompt_version == "3"
+
+
+def test_trace_id_is_none_when_tracing_is_off():
+    # conftest.py turns tracing off, as when Langfuse has no keys
+    response = generate(FakeAIClient(ideas_json()))
+
+    assert response.trace_id is None
+    assert response.model == "amazon.nova-micro-v1:0"

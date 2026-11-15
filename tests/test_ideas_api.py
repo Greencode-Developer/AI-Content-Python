@@ -27,6 +27,8 @@ IDEAS = {
     ]
 }
 
+META = {"trace_id": "trace-1", "model": "amazon.nova-micro-v1:0", "prompt_version": "3"}
+
 fake_client = object()
 
 
@@ -42,14 +44,15 @@ def test_generate_ideas_uses_the_path_the_java_worker_calls(client, monkeypatch)
 
     async def fake_service(request, ai_client):
         received.update(request=request, ai_client=ai_client)
-        return GenerateIdeaResponse.model_validate(IDEAS)
+        return GenerateIdeaResponse.model_validate({**IDEAS, **META})
 
     monkeypatch.setattr("app.api.ideas.generate_idea_service", fake_service)
 
     response = client.post("/api/v1/ideas/generate?provider=bedrock", json=JAVA_REQUEST)
 
     assert response.status_code == 200
-    assert response.json() == IDEAS
+    # Same snake_case names the Java GenerateIdeaResponse reads with @JsonProperty
+    assert response.json() == {**IDEAS, **META}
     assert received["ai_client"] is fake_client
     assert received["request"].topic == "Tết sale"
 

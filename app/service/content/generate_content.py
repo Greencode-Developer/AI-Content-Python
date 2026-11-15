@@ -4,8 +4,6 @@ from app.core.llm_output import extract_json
 from app.infrastructure.llm.providers.base import AIClient
 from app.schemas.generate_content import GenerateContentRequest, GenerateContentResponse, GeneratedContent
 
-_UNKNOWN_MODEL = "unknown"
-
 
 async def generate_content_service(
     request: GenerateContentRequest,
@@ -16,11 +14,9 @@ async def generate_content_service(
 
     content = parse_response(raw, request.post_format)
 
-    model_name = getattr(type(ai_client), "MODEL_NAME", _UNKNOWN_MODEL)
-
     return GenerateContentResponse(
         content=content,
-        ai_model_used=model_name,
+        ai_model_used=ai_client.model,
         idea_id=request.idea_id,
         pillar_id=request.pillar_id,
         persona_id=request.persona_id,
