@@ -30,6 +30,8 @@ async def lifespan(_: FastAPI):
     except Exception:
         logger.warning("Langfuse is unreachable, traces will not be sent", exc_info=True)
     yield
+    # Traces are sent in batches in the background: send the last ones before the process stops
+    get_client().flush()
 
 
 app = FastAPI(

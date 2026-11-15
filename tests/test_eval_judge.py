@@ -91,12 +91,12 @@ def test_score_outside_the_scale_is_invalid():
 def test_claude_judge_runs_at_temperature_zero_without_top_p():
     client = create_judge_client("haiku-4.5")
 
-    assert client._model_id == JUDGE_MODELS["haiku-4.5"]
+    assert client.model == JUDGE_MODELS["haiku-4.5"]
     assert client._inference_config == {"maxTokens": 2048, "temperature": 0}
 
 
 def test_production_bedrock_client_keeps_its_settings():
     client = BedrockAIClient()
 
-    assert client._model_id == "amazon.nova-micro-v1:0"
+    assert client.model == "amazon.nova-micro-v1:0"
     assert client._inference_config == {"maxTokens": 2048, "temperature": 0.7, "topP": 0.9}

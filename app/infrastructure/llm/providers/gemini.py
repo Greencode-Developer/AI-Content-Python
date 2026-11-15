@@ -13,6 +13,7 @@ class GeminiAIClient:
 
     def __init__(self):
         self.client = genai.Client()
+        self.model = _GEMINI_MODEL
 
     async def generate(self, prompt: str, json_schema: dict | None = None) -> str:
         config = None
@@ -23,7 +24,7 @@ class GeminiAIClient:
             )
         try:
             response = await self.client.aio.models.generate_content(
-                model=_GEMINI_MODEL,
+                model=self.model,
                 contents=prompt,
                 config=config,
             )
